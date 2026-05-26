@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2019
+    runs-on: windows-latest
 
     steps:
     - name: Checkout HeavenClient source
@@ -13,6 +13,25 @@ jobs:
       with:
         repository: ryantpayton/MapleStory-Client
         path: client
+
+    - name: Install v140 toolset
+      shell: pwsh
+      run: |
+        $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vsPath = (& $vsWhere -latest -products * -property installationPath).Trim()
+        Write-Host "VS path: $vsPath"
+        $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        $proc = Start-Process -FilePath $installer -ArgumentList @(
+          "modify",
+          "--installPath", $vsPath,
+          "--add", "Microsoft.VisualStudio.Component.VC.140",
+          "--quiet", "--norestart", "--force"
+        ) -Wait -PassThru -NoNewWindow
+        Write-Host "Exit code: $($proc.ExitCode)"
+        if ($proc.ExitCode -notin @(0, 3010)) {
+          Write-Error "v140 install failed with exit code $($proc.ExitCode)"
+          exit 1
+        }
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
