@@ -91,10 +91,7 @@ jobs:
         Copy-Item x64/Release/MapleStory.exe release/
         Copy-Item includes/bass24/bass.dll release/ -ErrorAction SilentlyContinue
         Copy-Item "includes/glew-2.1.0/bin/Release/x64/glew32.dll" release/ -ErrorAction SilentlyContinue
-        @"
-ServerIP = 192.168.31.170
-ServerPort = 8484
-"@ | Out-File -Encoding utf8 release/Settings
+        "ServerIP = 192.168.31.170`nServerPort = 8484" | Out-File -Encoding utf8 release/Settings
 
     - name: Upload HeavenClient artifact
       uses: actions/upload-artifact@v4
