@@ -14,26 +14,27 @@ jobs:
         repository: ryantpayton/MapleStory-Client
         path: client
 
-    - name: Ensure v140 toolset
+    - name: Install v140 toolset
       shell: pwsh
       run: |
         $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-        $already = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.140 -property installationPath 2>$null
-        if ($already) {
-          Write-Host "v140 already present: $already"
-          exit 0
-        }
-        Write-Host "v140 not found, installing..."
         $vsPath = (& $vsWhere -latest -products * -property installationPath).Trim()
+        Write-Host "VS: $vsPath"
         $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-        $proc = Start-Process -FilePath $installer -ArgumentList @(
+        $proc = Start-Process $installer -ArgumentList @(
           "modify", "--installPath", $vsPath,
           "--add", "Microsoft.VisualStudio.Component.VC.140",
           "--quiet", "--norestart"
         ) -Wait -PassThru -NoNewWindow
-        Write-Host "Exit code: $($proc.ExitCode)"
-        if ($proc.ExitCode -notin @(0, 3010)) {
-          Write-Error "v140 install failed (exit $($proc.ExitCode))"
+        $code = $proc.ExitCode
+        Write-Host "Exit code: $code"
+        $log = Get-ChildItem "$env:TEMP" -Filter "dd_setup_*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($log) {
+          Write-Host "=== VS Installer Log ==="
+          Get-Content $log.FullName | Select-Object -Last 80
+        }
+        if ($code -notin @(0, 3010)) {
+          Write-Error "v140 install failed (exit $code)"
           exit 1
         }
 
