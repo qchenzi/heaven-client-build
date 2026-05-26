@@ -17,6 +17,33 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    - name: Patch source files for MSVC v143 compatibility
+      shell: pwsh
+      working-directory: client
+      run: |
+        # Fix 1: EnumMap.h missing #include <stdexcept>
+        $file = "Template/EnumMap.h"
+        $content = Get-Content $file -Raw
+        $content = $content -replace '#pragma once', "#pragma once`r`n#include <stdexcept>"
+        Set-Content $file $content -Encoding UTF8 -NoNewline
+
+        # Fix 2: DrawArgument.h narrowing int->int16_t in return initializer list
+        $file = "Graphics/DrawArgument.h"
+        $content = Get-Content $file -Raw
+        $content = $content.Replace(
+          'cx + static_cast<int16_t>(xscale * rl)',
+          'static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rl))')
+        $content = $content.Replace(
+          'cx + static_cast<int16_t>(xscale * rr)',
+          'static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rr))')
+        $content = $content.Replace(
+          'cy + static_cast<int16_t>(yscale * rt)',
+          'static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rt))')
+        $content = $content.Replace(
+          'cy + static_cast<int16_t>(yscale * rb)',
+          'static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rb))')
+        Set-Content $file $content -Encoding UTF8 -NoNewline
+
     - name: Build HeavenClient
       shell: pwsh
       working-directory: client
