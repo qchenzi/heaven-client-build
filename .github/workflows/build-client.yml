@@ -14,22 +14,26 @@ jobs:
         repository: ryantpayton/MapleStory-Client
         path: client
 
-    - name: Install v140 toolset
+    - name: Ensure v140 toolset
       shell: pwsh
       run: |
         $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $already = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.140 -property installationPath 2>$null
+        if ($already) {
+          Write-Host "v140 already present: $already"
+          exit 0
+        }
+        Write-Host "v140 not found, installing..."
         $vsPath = (& $vsWhere -latest -products * -property installationPath).Trim()
-        Write-Host "VS path: $vsPath"
         $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
         $proc = Start-Process -FilePath $installer -ArgumentList @(
-          "modify",
-          "--installPath", $vsPath,
+          "modify", "--installPath", $vsPath,
           "--add", "Microsoft.VisualStudio.Component.VC.140",
-          "--quiet", "--norestart", "--force"
+          "--quiet", "--norestart"
         ) -Wait -PassThru -NoNewWindow
         Write-Host "Exit code: $($proc.ExitCode)"
         if ($proc.ExitCode -notin @(0, 3010)) {
-          Write-Error "v140 install failed with exit code $($proc.ExitCode)"
+          Write-Error "v140 install failed (exit $($proc.ExitCode))"
           exit 1
         }
 
