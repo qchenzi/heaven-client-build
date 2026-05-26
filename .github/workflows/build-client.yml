@@ -18,31 +18,37 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Patch source files for MSVC v143 compatibility
-      shell: pwsh
+      shell: python
       working-directory: client
       run: |
         # Fix 1: EnumMap.h missing #include <stdexcept>
-        $file = "Template/EnumMap.h"
-        $content = Get-Content $file -Raw
-        $content = $content -replace '#pragma once', "#pragma once`r`n#include <stdexcept>"
-        Set-Content $file $content -Encoding UTF8 -NoNewline
+        with open('Template/EnumMap.h', 'r', encoding='utf-8') as f:
+            content = f.read()
+        if '#include <stdexcept>' not in content:
+            content = content.replace('#pragma once', '#pragma once\n#include <stdexcept>', 1)
+            with open('Template/EnumMap.h', 'w', encoding='utf-8') as f:
+                f.write(content)
+            print('Patched EnumMap.h')
+        else:
+            print('EnumMap.h already patched')
 
         # Fix 2: DrawArgument.h narrowing int->int16_t in return initializer list
-        $file = "Graphics/DrawArgument.h"
-        $content = Get-Content $file -Raw
-        $content = $content.Replace(
-          'cx + static_cast<int16_t>(xscale * rl)',
-          'static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rl))')
-        $content = $content.Replace(
-          'cx + static_cast<int16_t>(xscale * rr)',
-          'static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rr))')
-        $content = $content.Replace(
-          'cy + static_cast<int16_t>(yscale * rt)',
-          'static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rt))')
-        $content = $content.Replace(
-          'cy + static_cast<int16_t>(yscale * rb)',
-          'static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rb))')
-        Set-Content $file $content -Encoding UTF8 -NoNewline
+        with open('Graphics/DrawArgument.h', 'r', encoding='utf-8') as f:
+            content = f.read()
+        patches = [
+            ('cx + static_cast<int16_t>(xscale * rl)', 'static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rl))'),
+            ('cx + static_cast<int16_t>(xscale * rr)', 'static_cast<int16_t>(cx + static_cast<int16_t>(xscale * rr))'),
+            ('cy + static_cast<int16_t>(yscale * rt)', 'static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rt))'),
+            ('cy + static_cast<int16_t>(yscale * rb)', 'static_cast<int16_t>(cy + static_cast<int16_t>(yscale * rb))'),
+        ]
+        for old, new in patches:
+            if old in content:
+                content = content.replace(old, new)
+                print(f'Patched: {old[:40]}...')
+            else:
+                print(f'WARNING: pattern not found: {old[:40]}...')
+        with open('Graphics/DrawArgument.h', 'w', encoding='utf-8') as f:
+            f.write(content)
 
     - name: Build HeavenClient
       shell: pwsh
@@ -52,6 +58,7 @@ jobs:
           /p:Configuration=Release /p:Platform=x64 `
           /p:PlatformToolset=v143 `
           /p:WindowsTargetPlatformVersion=10.0 `
+          "/p:AdditionalOptions=/permissive" `
           /v:m /m
 
     - name: Collect release files
