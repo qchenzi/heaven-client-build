@@ -67,6 +67,7 @@ jobs:
         Push-Location includes/NoLifeNx
         msbuild NoLifeNx.sln /p:Configuration=Release /p:Platform=x64 `
           /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /v:m
+        # Copy output to the path expected by MapleStory.vcxproj
         $lib = Get-ChildItem -Recurse -Filter "NoLifeNx.lib" | Select-Object -First 1
         if (-not $lib) { $lib = Get-ChildItem -Recurse -Filter "*.lib" | Select-Object -First 1 }
         New-Item -Force -ItemType Directory nlnx/x64/Release | Out-Null
@@ -89,9 +90,14 @@ jobs:
       run: |
         New-Item -Force -ItemType Directory release | Out-Null
         Copy-Item x64/Release/MapleStory.exe release/
+        # Runtime DLLs required alongside the exe
         Copy-Item includes/bass24/bass.dll release/ -ErrorAction SilentlyContinue
         Copy-Item "includes/glew-2.1.0/bin/Release/x64/glew32.dll" release/ -ErrorAction SilentlyContinue
-        "ServerIP = 192.168.31.170`nServerPort = 8484" | Out-File -Encoding utf8 release/Settings
+        # Pre-configured Settings file: points to your server
+        @"
+        ServerIP = 192.168.31.170
+        ServerPort = 8484
+        "@ | Out-File -Encoding utf8 release/Settings
 
     - name: Upload HeavenClient artifact
       uses: actions/upload-artifact@v4
