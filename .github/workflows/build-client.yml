@@ -1,0 +1,104 @@
+name: Build HeavenClient (Windows)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout HeavenClient source
+      uses: actions/checkout@v4
+      with:
+        repository: ryantpayton/MapleStory-Client
+        path: client
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Create includes directory
+      shell: pwsh
+      working-directory: client
+      run: New-Item -ItemType Directory -Force includes | Out-Null
+
+    - name: Download GLEW 2.1.0
+      shell: pwsh
+      working-directory: client
+      run: |
+        Invoke-WebRequest https://github.com/nigels-com/glew/releases/download/glew-2.1.0/glew-2.1.0-win32.zip -OutFile glew.zip
+        Expand-Archive glew.zip includes
+
+    - name: Download GLFW 3.3.2
+      shell: pwsh
+      working-directory: client
+      run: |
+        Invoke-WebRequest https://github.com/glfw/glfw/releases/download/3.3.2/glfw-3.3.2.bin.WIN64.zip -OutFile glfw.zip
+        Expand-Archive glfw.zip includes
+
+    - name: Download FreeType (prebuilt Windows)
+      shell: pwsh
+      working-directory: client
+      run: |
+        Invoke-WebRequest https://github.com/ubawurinna/freetype-windows-binaries/archive/refs/heads/master.zip -OutFile ft.zip
+        Expand-Archive ft.zip .
+        New-Item -Force -ItemType Directory includes/freetype/include | Out-Null
+        New-Item -Force -ItemType Directory includes/freetype/win64  | Out-Null
+        Copy-Item -Recurse "freetype-windows-binaries-master/include/*" includes/freetype/include/
+        Copy-Item "freetype-windows-binaries-master/release static/vs2015-2022/win64/freetype.lib" includes/freetype/win64/
+
+    - name: Download Bass 2.4
+      shell: pwsh
+      working-directory: client
+      run: |
+        Invoke-WebRequest https://www.un4seen.com/files/bass24.zip -OutFile bass.zip -UserAgent "Mozilla/5.0"
+        New-Item -Force -ItemType Directory includes/bass24 | Out-Null
+        Expand-Archive bass.zip includes/bass24
+
+    - name: Clone stb (header-only)
+      working-directory: client
+      run: git clone https://github.com/nothings/stb includes/stb --depth 1
+
+    - name: Clone and build NoLifeNx
+      shell: pwsh
+      working-directory: client
+      run: |
+        git clone https://github.com/ryantpayton/NoLifeNx includes/NoLifeNx --depth 1
+        Push-Location includes/NoLifeNx
+        msbuild NoLifeNx.sln /p:Configuration=Release /p:Platform=x64 `
+          /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /v:m
+        $lib = Get-ChildItem -Recurse -Filter "NoLifeNx.lib" | Select-Object -First 1
+        if (-not $lib) { $lib = Get-ChildItem -Recurse -Filter "*.lib" | Select-Object -First 1 }
+        New-Item -Force -ItemType Directory nlnx/x64/Release | Out-Null
+        Copy-Item $lib.FullName nlnx/x64/Release/NoLifeNx.lib
+        Pop-Location
+
+    - name: Build HeavenClient
+      shell: pwsh
+      working-directory: client
+      run: |
+        msbuild MapleStory.sln `
+          /p:Configuration=Release /p:Platform=x64 `
+          /p:PlatformToolset=v143 `
+          /p:WindowsTargetPlatformVersion=10.0 `
+          /v:m /m
+
+    - name: Collect release files
+      shell: pwsh
+      working-directory: client
+      run: |
+        New-Item -Force -ItemType Directory release | Out-Null
+        Copy-Item x64/Release/MapleStory.exe release/
+        Copy-Item includes/bass24/bass.dll release/ -ErrorAction SilentlyContinue
+        Copy-Item "includes/glew-2.1.0/bin/Release/x64/glew32.dll" release/ -ErrorAction SilentlyContinue
+        @"
+ServerIP = 192.168.31.170
+ServerPort = 8484
+"@ | Out-File -Encoding utf8 release/Settings
+
+    - name: Upload HeavenClient artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: HeavenClient-v83
+        path: client/release/
+        retention-days: 14
